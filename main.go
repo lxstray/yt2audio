@@ -37,7 +37,7 @@ func Yt2mp3(c echo.Context) error {
 
 	title, author, videoId := getInfo(url)
 
-	tempAudioPath, audioPath, coverPath := generateTempFilesNames()
+	audioPath, coverPath := generateTempFilesNames()
 
 	//TODO: если status code 200 для maxres то делать hq
 
@@ -65,20 +65,25 @@ func Yt2mp3(c echo.Context) error {
 	}
 
 	//audio
-	audioCmd := exec.Command("./yt-dlp", "-x", "-f", "m4a", "--no-playlist", url, "-o", tempAudioPath)
+	audioCmd := exec.Command("./yt-dlp", "-x", "-f", "m4a", "--no-playlist", url, "-o", "-")
+	audioPipe, err := audioCmd.StdoutPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ffmpegCmd := exec.Command("./ffmpeg", "-i", "pipe:0", "-i", coverPath, "-map", "0", "-map", "1", "-c", "copy", "-metadata", "artist="+author, "-metadata", "title="+title, "-disposition:v:0", "attached_pic", audioPath)
+	ffmpegCmd.Stdin = audioPipe
 
 	if err := audioCmd.Start(); err != nil {
 		return err
 	}
 
-	if err := audioCmd.Wait(); err != nil {
-		log.Fatal(err)
-	}
-
-	ffmpegCmd := exec.Command("./ffmpeg", "-i", tempAudioPath, "-i", coverPath, "-map", "0", "-map", "1", "-c", "copy", "-metadata", "artist="+author, "-metadata", "title="+title, "-disposition:v:0", "attached_pic", audioPath)
-
 	if err := ffmpegCmd.Start(); err != nil {
 		return err
+	}
+
+	if err := audioCmd.Wait(); err != nil {
+		log.Fatal(err)
 	}
 
 	if err := ffmpegCmd.Wait(); err != nil {
@@ -89,17 +94,15 @@ func Yt2mp3(c echo.Context) error {
 
 	defer os.Remove(audioPath)
 	defer os.Remove(coverPath)
-	defer os.Remove(tempAudioPath)
 
 	return c.Attachment(audioPath, fileName)
 }
 
-func generateTempFilesNames() (string, string, string) {
-	tempAudioTemp := "temp\\" + uuid.New().String() + "-temp" + ".m4a"
+func generateTempFilesNames() (string, string) {
 	tempAudio := "temp\\" + uuid.New().String() + ".m4a"
 	tempCover := "temp\\" + uuid.New().String() + ".png"
 
-	return tempAudioTemp, tempAudio, tempCover
+	return tempAudio, tempCover
 }
 
 type VideoInfo struct {
