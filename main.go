@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"image"
 	"log"
 	"net/http"
 	"os"
@@ -39,8 +40,6 @@ func Yt2mp3(c echo.Context) error {
 
 	audioPath, coverPath := generateTempFilesNames()
 
-	//TODO: если status code 200 для maxres то делать hq
-
 	// //cover
 	coverUrl := fmt.Sprintf("https://img.youtube.com/vi/%s/maxresdefault.jpg", videoId)
 
@@ -50,18 +49,43 @@ func Yt2mp3(c echo.Context) error {
 	}
 	defer resp.Body.Close()
 
-	img, err := imaging.Decode(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	if resp.StatusCode == 404 {
+		coverUrl := fmt.Sprintf("https://img.youtube.com/vi/%s/hqdefault.jpg", videoId)
 
-	croppedImg := imaging.CropCenter(img, min(img.Bounds().Dx(), img.Bounds().Dy()), min(img.Bounds().Dx(), img.Bounds().Dy()))
+		resp, err := http.Get(coverUrl)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer resp.Body.Close()
 
-	finalImg := imaging.Resize(croppedImg, 1600, 1600, imaging.Lanczos)
+		img, err := imaging.Decode(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	err = imaging.Save(finalImg, coverPath)
-	if err != nil {
-		log.Fatal(err)
+		croppedImg := imaging.Crop(img, image.Rect(105, 45, 105+270, 45+270))
+
+		finalImg := imaging.Resize(croppedImg, 1600, 1600, imaging.Lanczos)
+
+		err = imaging.Save(finalImg, coverPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	} else {
+		img, err := imaging.Decode(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		croppedImg := imaging.CropCenter(img, min(img.Bounds().Dx(), img.Bounds().Dy()), min(img.Bounds().Dx(), img.Bounds().Dy()))
+
+		finalImg := imaging.Resize(croppedImg, 1600, 1600, imaging.Lanczos)
+
+		err = imaging.Save(finalImg, coverPath)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	//audio
@@ -70,6 +94,8 @@ func Yt2mp3(c echo.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	//TODO: мб попробовать использовать fifo в линуксе что бы предать трек и картинку как поток
 
 	ffmpegCmd := exec.Command("./ffmpeg", "-i", "pipe:0", "-i", coverPath, "-map", "0", "-map", "1", "-c", "copy", "-metadata", "artist="+author, "-metadata", "title="+title, "-disposition:v:0", "attached_pic", audioPath)
 	ffmpegCmd.Stdin = audioPipe
