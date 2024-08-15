@@ -138,7 +138,7 @@ type VideoInfo struct {
 }
 
 func getInfo(url string) (string, string, string) {
-	infoJSONCmd := exec.Command("./yt-dlp", "-j", url)
+	infoJSONCmd := exec.Command("./yt-dlp", "--no-playlist", "-j", url)
 
 	infoJSON, err := infoJSONCmd.Output()
 	if err != nil {
