@@ -1,5 +1,7 @@
 //TODO: поменять вызов yt-dlp и ffmpeg
 
+//TODO: проверить большие файлы
+
 package main
 
 import (
@@ -40,7 +42,7 @@ func Yt2mp3(c echo.Context) error {
 
 	audioPath, coverPath := generateTempFilesNames()
 
-	// //cover
+	//cover
 	coverUrl := fmt.Sprintf("https://img.youtube.com/vi/%s/maxresdefault.jpg", videoId)
 
 	resp, err := http.Get(coverUrl)
@@ -125,8 +127,8 @@ func Yt2mp3(c echo.Context) error {
 }
 
 func generateTempFilesNames() (string, string) {
-	tempAudio := "temp\\" + uuid.New().String() + ".m4a"
-	tempCover := "temp\\" + uuid.New().String() + ".png"
+	tempAudio := "..\\temp\\" + uuid.New().String() + ".m4a"
+	tempCover := "..\\temp\\" + uuid.New().String() + ".png"
 
 	return tempAudio, tempCover
 }
